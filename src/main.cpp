@@ -217,8 +217,9 @@ protected:
                     batchArray->addObject(obj);
                 }
             }
-            // Native EditorUI deletion properly unlinks paired teleport portals & moving caches
-            m_editorUI->deleteObjects(batchArray, false);
+            // Native EditorUI selection + delete properly unlinks paired teleport portals & moving caches
+            m_editorUI->selectObjects(batchArray, true);
+            m_editorUI->onDeleteSelected(nullptr);
         } else {
             for (; m_cursor < endIdx; ++m_cursor) {
                 if (auto* obj = m_queue[m_cursor].data()) {
