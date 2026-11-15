@@ -8,53 +8,13 @@ using namespace geode::prelude;
 static bool isGameplayObject(GameObject* obj) {
     if (!obj) return false;
 
-    // Protect objects with no-touch / passable disabled or active collision types
-    switch (obj->m_objectType) {
-        case GameObjectType::Solid:
-        case GameObjectType::Hazard:
-        case GameObjectType::AnimatedHazard:
-        case GameObjectType::Slope:
-        case GameObjectType::InverseGravityPortal:
-        case GameObjectType::NormalGravityPortal:
-        case GameObjectType::ShipPortal:
-        case GameObjectType::CubePortal:
-        case GameObjectType::BallPortal:
-        case GameObjectType::UfoPortal:
-        case GameObjectType::WavePortal:
-        case GameObjectType::RobotPortal:
-        case GameObjectType::SpiderPortal:
-        case GameObjectType::SwingPortal:
-        case GameObjectType::YellowJumpPad:
-        case GameObjectType::PinkJumpPad:
-        case GameObjectType::RedJumpPad:
-        case GameObjectType::GravityPad:
-        case GameObjectType::YellowJumpRing:
-        case GameObjectType::PinkJumpRing:
-        case GameObjectType::RedJumpRing:
-        case GameObjectType::GravityRing:
-        case GameObjectType::GreenRing:
-        case GameObjectType::DashRing:
-        case GameObjectType::GravityDashRing:
-        case GameObjectType::DropRing:
-        case GameObjectType::CustomRing:
-        case GameObjectType::TeleportPortal:
-        case GameObjectType::MiniSizePortal:
-        case GameObjectType::RegularSizePortal:
-        case GameObjectType::DualPortal:
-        case GameObjectType::SinglePortal:
-        case GameObjectType::NormalMirrorPortal:
-        case GameObjectType::InverseMirrorPortal:
-        case GameObjectType::SecretCoin:
-        case GameObjectType::UserCoin:
-        case GameObjectType::Collectible:
-        case GameObjectType::Modifier:
-        case GameObjectType::Breakable:
-            return true;
-        default:
-            break;
+    // In GD, purely decorative objects use GameObjectType::Decoration (7).
+    // Everything else (Solid, Hazard, Slope, Portals, Pads, Orbs, Coins, Breakables, etc.)
+    // plus triggers and Start Pos (ID 31) is gameplay/functional.
+    if (obj->m_objectType != GameObjectType::Decoration) {
+        return true;
     }
 
-    // Protect start positions (ID 31) and common gameplay triggers
     if (obj->m_objectID == 31 || obj->m_isTrigger) {
         return true;
     }
@@ -179,7 +139,7 @@ protected:
                 continue;
             }
 
-            // If Strip Deco Only is enabled, protect solids, hazards, portals, orbs, pads, triggers
+            // If Strip Deco Only is enabled, protect gameplay objects and triggers
             if (m_decoOnly && isGameplayObject(obj)) {
                 continue;
             }
