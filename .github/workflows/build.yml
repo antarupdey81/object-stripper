@@ -10,3 +10,4 @@ jobs:
     uses: geode-sdk/build-geode-mod/.github/workflows/build.yml@v1
     with:
       platforms: android64
+      geode: v5.11.2
