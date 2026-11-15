@@ -9,11 +9,19 @@ using namespace geode::prelude;
 static bool isGameplayObject(GameObject* obj) {
     if (!obj) return false;
 
+    // 1. Protect any non-decoration object type (solids, hazards, portals, orbs, pads, slopes, collectibles)
     if (obj->m_objectType != GameObjectType::Decoration) {
         return true;
     }
 
+    // 2. Protect Start Pos (ID 31) and triggers
     if (obj->m_objectID == 31 || obj->m_isTrigger) {
+        return true;
+    }
+
+    // 3. Protect any object assigned to a Group ID so Move/Alpha/Toggle/Animate triggers
+    // (such as Deadlocked's bosses and moving platforms) never crash on Save & Play
+    if (obj->m_groupCount > 0) {
         return true;
     }
 
@@ -164,7 +172,7 @@ protected:
 
         if (m_queue.empty()) {
             std::string reason = m_decoOnly
-                ? "All objects are gameplay or on locked layers."
+                ? "All objects are gameplay, trigger-grouped, or on locked layers."
                 : "All objects are on locked layers.";
             FLAlertLayer::create("Nothing to Strip", reason, "OK")->show();
             return;
@@ -241,7 +249,7 @@ protected:
 
         if (removedCount < requested) {
             std::string reason = decoOnly
-                ? "remaining objects are <cy>gameplay</c> or on <cr>locked layers</c>."
+                ? "remaining objects are <cy>gameplay</c>, <cy>grouped</c>, or on <cr>locked layers</c>."
                 : "remaining objects are on <cr>locked layers</c>.";
             FLAlertLayer::create(
                 "Partially Stripped",
