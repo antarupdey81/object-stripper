@@ -8,6 +8,8 @@ else()
 endif()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+add_compile_options(-include type_traits)
+
 project(object-stripper VERSION 1.0.0)
 
 add_library(object-stripper SHARED
