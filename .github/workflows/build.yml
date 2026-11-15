@@ -33,8 +33,10 @@ jobs:
 
       - name: Install Geode SDK
         run: |
-          mkdir -p ~/.local/share/Geode /tmp/gd/geode/mods
-          printf "default\n/tmp/gd\nwin\n" | geode config setup || true
+          mkdir -p /tmp/gd/geode/mods
+          touch /tmp/gd/GeometryDash.exe
+          geode profile add default /tmp/gd --platform win || printf "default\nwin\n/tmp/gd\n" | geode config setup || true
+          geode profile switch default || true
           geode sdk install /home/runner/geode-sdk
           git -C /home/runner/geode-sdk fetch --tags
           git -C /home/runner/geode-sdk checkout v5.11.2
