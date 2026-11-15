@@ -2,15 +2,13 @@
 #include <Geode/modify/EditorPauseLayer.hpp>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 using namespace geode::prelude;
 
 static bool isGameplayObject(GameObject* obj) {
     if (!obj) return false;
 
-    // In GD, purely decorative objects use GameObjectType::Decoration (7).
-    // Everything else (Solid, Hazard, Slope, Portals, Pads, Orbs, Coins, Breakables, etc.)
-    // plus triggers and Start Pos (ID 31) is gameplay/functional.
     if (obj->m_objectType != GameObjectType::Decoration) {
         return true;
     }
@@ -27,11 +25,21 @@ protected:
     EditorUI* m_editorUI = nullptr;
     TextInput* m_countInput = nullptr;
     CCLabelBMFont* m_currentCountLabel = nullptr;
+    CCLabelBMFont* m_statusLabel = nullptr;
     CCMenuItemToggler* m_decoOnlyToggle = nullptr;
+    CCMenuItemSpriteExtra* m_stripBtn = nullptr;
+
     bool m_decoOnly = false;
+    bool m_isStripping = false;
+
+    std::vector<Ref<GameObject>> m_queue;
+    size_t m_cursor = 0;
+    size_t m_requestedDelete = 0;
+
+    static constexpr size_t BATCH_SIZE = 2500;
 
     bool init(EditorUI* editorUI) {
-        if (!Popup::init(275.f, 215.f)) {
+        if (!Popup::init(280.f, 225.f)) {
             return false;
         }
 
@@ -68,32 +76,41 @@ protected:
             menu_selector(StripObjectsPopup::onToggleDecoOnly),
             0.65f
         );
-        m_decoOnlyToggle->setPosition({ m_size.width / 2.f - 62.f, m_size.height - 140.f });
+        m_decoOnlyToggle->setPosition({ m_size.width / 2.f - 62.f, m_size.height - 138.f });
         m_buttonMenu->addChild(m_decoOnlyToggle);
 
         auto decoLabel = CCLabelBMFont::create("Strip Deco Only", "bigFont.fnt");
         decoLabel->setScale(0.42f);
         decoLabel->setAnchorPoint({ 0.f, 0.5f });
-        decoLabel->setPosition({ m_size.width / 2.f - 44.f, m_size.height - 140.f });
+        decoLabel->setPosition({ m_size.width / 2.f - 44.f, m_size.height - 138.f });
         m_mainLayer->addChild(decoLabel);
 
+        m_statusLabel = CCLabelBMFont::create("", "chatFont.fnt");
+        m_statusLabel->setScale(0.65f);
+        m_statusLabel->setPosition({ m_size.width / 2.f, 62.f });
+        m_statusLabel->setVisible(false);
+        m_mainLayer->addChild(m_statusLabel);
+
         auto stripSpr = ButtonSprite::create("Strip", "goldFont.fnt", "GJ_button_06.png", 0.8f);
-        auto stripBtn = CCMenuItemSpriteExtra::create(
+        m_stripBtn = CCMenuItemSpriteExtra::create(
             stripSpr,
             this,
             menu_selector(StripObjectsPopup::onStrip)
         );
-        stripBtn->setPosition({ m_size.width / 2.f, 32.f });
-        m_buttonMenu->addChild(stripBtn);
+        m_stripBtn->setPosition({ m_size.width / 2.f, 32.f });
+        m_buttonMenu->addChild(m_stripBtn);
 
         return true;
     }
 
     void onToggleDecoOnly(CCObject*) {
+        if (m_isStripping) return;
         m_decoOnly = !m_decoOnly;
     }
 
     void onStrip(CCObject*) {
+        if (m_isStripping) return;
+
         auto editorLayer = LevelEditorLayer::get();
         if (!editorLayer || !editorLayer->m_objects) {
             FLAlertLayer::create("Error", "Could not access editor objects.", "OK")->show();
@@ -124,48 +141,106 @@ protected:
             return;
         }
 
-        size_t toDelete = totalObjects - targetCount;
+        m_requestedDelete = totalObjects - targetCount;
+        m_queue.clear();
+        m_queue.reserve(m_requestedDelete);
+        m_cursor = 0;
 
-        std::vector<GameObject*> objectsToRemove;
-        objectsToRemove.reserve(toDelete);
-
-        for (int i = static_cast<int>(totalObjects) - 1; i >= 0 && objectsToRemove.size() < toDelete; --i) {
+        for (int i = static_cast<int>(totalObjects) - 1; i >= 0 && m_queue.size() < m_requestedDelete; --i) {
             auto obj = static_cast<GameObject*>(editorLayer->m_objects->objectAtIndex(i));
             if (!obj) continue;
 
-            // Always protect locked layers
             if (editorLayer->isLayerLocked(obj->m_editorLayer) ||
                 (obj->m_editorLayer2 != 0 && editorLayer->isLayerLocked(obj->m_editorLayer2))) {
                 continue;
             }
 
-            // If Strip Deco Only is enabled, protect gameplay objects and triggers
             if (m_decoOnly && isGameplayObject(obj)) {
                 continue;
             }
 
-            objectsToRemove.push_back(obj);
+            m_queue.emplace_back(obj);
         }
 
-        size_t removedCount = objectsToRemove.size();
+        if (m_queue.empty()) {
+            std::string reason = m_decoOnly
+                ? "All objects are gameplay or on locked layers."
+                : "All objects are on locked layers.";
+            FLAlertLayer::create("Nothing to Strip", reason, "OK")->show();
+            return;
+        }
+
+        // Lock controls and begin frame-chunked deletion
+        m_isStripping = true;
+        m_stripBtn->setEnabled(false);
+        m_decoOnlyToggle->setEnabled(false);
+        m_countInput->setEnabled(false);
+        if (m_closeBtn) m_closeBtn->setEnabled(false);
 
         if (m_editorUI) {
             m_editorUI->deselectAll();
         }
 
-        for (auto* obj : objectsToRemove) {
-            editorLayer->removeObject(obj, false);
+        m_statusLabel->setVisible(true);
+        m_statusLabel->setString(fmt::format("Stripping 0 / {}...", m_queue.size()).c_str());
+
+        this->schedule(schedule_selector(StripObjectsPopup::processBatch));
+    }
+
+    void processBatch(float) {
+        auto editorLayer = LevelEditorLayer::get();
+        if (!editorLayer || !editorLayer->m_objects) {
+            this->finishStripping();
+            return;
         }
+
+        size_t totalToRemove = m_queue.size();
+        size_t endIdx = std::min(m_cursor + BATCH_SIZE, totalToRemove);
+
+        for (; m_cursor < endIdx; ++m_cursor) {
+            if (auto* obj = m_queue[m_cursor].data()) {
+                editorLayer->removeObject(obj, false);
+            }
+        }
+
+        size_t currentCount = editorLayer->m_objects->count();
+        int percent = totalToRemove > 0
+            ? static_cast<int>((m_cursor * 100) / totalToRemove)
+            : 100;
+
+        m_currentCountLabel->setString(fmt::format("Current Objects: {}", currentCount).c_str());
+        m_statusLabel->setString(
+            fmt::format("Stripping {} / {} ({}%)", m_cursor, totalToRemove, percent).c_str()
+        );
+
+        if (m_cursor >= totalToRemove) {
+            this->finishStripping();
+        }
+    }
+
+    void finishStripping() {
+        this->unschedule(schedule_selector(StripObjectsPopup::processBatch));
+
+        size_t removedCount = m_cursor;
+        size_t requested = m_requestedDelete;
+        bool decoOnly = m_decoOnly;
+
+        m_queue.clear();
+        m_queue.shrink_to_fit();
+        m_isStripping = false;
 
         if (m_editorUI) {
             m_editorUI->updateButtons();
             m_editorUI->updateObjectInfoLabel();
         }
 
-        size_t remaining = editorLayer->m_objects->count();
+        auto editorLayer = LevelEditorLayer::get();
+        size_t remaining = (editorLayer && editorLayer->m_objects)
+            ? editorLayer->m_objects->count()
+            : 0;
 
-        if (removedCount < toDelete) {
-            std::string reason = m_decoOnly
+        if (removedCount < requested) {
+            std::string reason = decoOnly
                 ? "remaining objects are <cy>gameplay</c> or on <cr>locked layers</c>."
                 : "remaining objects are on <cr>locked layers</c>.";
             FLAlertLayer::create(
@@ -191,6 +266,12 @@ protected:
         }
 
         this->onClose(nullptr);
+    }
+
+    void keyBackClicked() override {
+        if (!m_isStripping) {
+            Popup::keyBackClicked();
+        }
     }
 
 public:
@@ -221,7 +302,6 @@ class $modify(StripEditorPauseLayer, EditorPauseLayer) {
         );
         btn->setID("strip-objects-btn"_spr);
 
-        // Place in guidelines-menu (bottom-left stack, completely clear of Uncheck Portals)
         if (auto guidelinesMenu = this->getChildByID("guidelines-menu")) {
             guidelinesMenu->addChild(btn);
             guidelinesMenu->updateLayout();
@@ -229,7 +309,6 @@ class $modify(StripEditorPauseLayer, EditorPauseLayer) {
             infoMenu->addChild(btn);
             infoMenu->updateLayout();
         } else {
-            auto winSize = CCDirector::sharedDirector()->getWinSize();
             auto fallbackMenu = CCMenu::create();
             fallbackMenu->setPosition({ 55.f, 95.f });
             fallbackMenu->addChild(btn);
