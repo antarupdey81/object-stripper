@@ -33,7 +33,7 @@ jobs:
 
       - name: Install Geode SDK
         run: |
-          mkdir -p ~/.local/share/Geode /tmp/gd
+          mkdir -p ~/.local/share/Geode /tmp/gd/geode/mods
           printf "default\n/tmp/gd\nandroid64\n" | geode config setup || true
           geode sdk install /home/runner/geode-sdk
           git -C /home/runner/geode-sdk fetch --tags
