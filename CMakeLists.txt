@@ -18,4 +18,4 @@ endif()
 
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 
-setup_geode_mod(${PROJECT_NAME} SOURCES src/main.cpp)
+setup_geode_mod(${object-stripper} SOURCES src/main.cpp)
