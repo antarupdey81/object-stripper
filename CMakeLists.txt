@@ -8,9 +8,9 @@ else()
 endif()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
-project(ObjectStripper VERSION 1.0.0)
+project(object-stripper VERSION 1.0.0)
 
-add_library(${object-stripper} SHARED
+add_library(object-stripper SHARED
     src/main.cpp
 )
 
@@ -22,4 +22,4 @@ endif()
 
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 
-setup_geode_mod(${object-stripper} ${object-stripper})
+setup_geode_mod(object-stripper)
