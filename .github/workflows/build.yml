@@ -31,19 +31,8 @@ jobs:
 
       - name: Install Geode SDK
         run: |
-          mkdir -p ~/.config/geode /tmp/gd
-          cat << 'EOF' > ~/.config/geode/config.json
-          {
-            "current-profile": "default",
-            "profiles": {
-              "default": {
-                "gd-path": "/tmp/gd",
-                "platform": "android64"
-              }
-            },
-            "sdk-nightly": false
-          }
-          EOF
+          mkdir -p ~/.local/share/Geode /tmp/gd
+          printf "default\n/tmp/gd\nandroid64\n" | geode config setup || true
           geode sdk install /home/runner/geode-sdk
           geode sdk set-path /home/runner/geode-sdk
           geode sdk install-binaries -p android64
