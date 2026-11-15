@@ -20,12 +20,7 @@ jobs:
 
       - name: Install Geode CLI
         run: |
-          CLI_URL=$(curl -s https://api.github.com/repos/geode-sdk/cli/releases/latest | grep -E "browser_download_url.*linux.*(x86_64|amd64).*\.zip" | head -n 1 | cut -d '"' -f 4)
-          if [ -z "$CLI_URL" ]; then
-            CLI_URL=$(curl -s https://api.github.com/repos/geode-sdk/cli/releases/latest | grep "browser_download_url.*linux.*\.zip" | grep -v "arm" | head -n 1 | cut -d '"' -f 4)
-          fi
-          echo "Downloading $CLI_URL"
-          curl -fL "$CLI_URL" -o geode-cli.zip
+          curl -fL "https://github.com/geode-sdk/cli/releases/download/v4.0.1/geode-cli-v4.0.1-linux-x86_64.zip" -o geode-cli.zip
           sudo unzip -o geode-cli.zip -d /usr/local/bin
           sudo chmod +x /usr/local/bin/geode
 
