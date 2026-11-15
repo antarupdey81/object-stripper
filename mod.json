@@ -1,0 +1,18 @@
+{
+	"geode": "5.7.0",
+	"gd": {
+		"android": "2.2081",
+		"win": "2.2081",
+		"mac": "2.2081",
+		"ios": "2.2081"
+	},
+	"version": "v1.0.0",
+	"id": "antarupdey81.object-stripper",
+	"name": "Object Stripper",
+	"developer": "antarupdey81",
+	"description": "Enter a target object count in the editor pause menu and automatically delete excess objects down to that exact number.",
+	"repository": "[https://github.com/antarupdey81/object-stripper](https://github.com/antarupdey81/object-stripper)",
+	"dependencies": {
+		"geode.node-ids": ">=v1.23.0"
+	}
+}
