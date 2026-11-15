@@ -19,9 +19,15 @@ jobs:
           add-to-path: true
 
       - name: Install Geode CLI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -fL "https://github.com/geode-sdk/cli/releases/download/v4.0.1/geode-cli-4.0.1-linux-x86_64.zip" -o geode-cli.zip || \
-          curl -fL "https://github.com/geode-sdk/cli/releases/download/v4.0.1/geode-cli-4.0.1-linux.zip" -o geode-cli.zip
+          CLI_URL=$(gh release view --repo geode-sdk/cli --json assets --jq '.assets[] | select(.name | test("linux.*(x86_64|amd64).*\\.zip$")) | .url' | head -n 1)
+          if [ -z "$CLI_URL" ]; then
+            CLI_URL=$(gh release view --repo geode-sdk/cli --json assets --jq '.assets[] | select(.name | test("linux.*\\.zip$")) | select(.name | test("arm") | not) | .url' | head -n 1)
+          fi
+          echo "Downloading $CLI_URL"
+          curl -fL "$CLI_URL" -o geode-cli.zip
           sudo unzip -o geode-cli.zip -d /usr/local/bin
           sudo chmod +x /usr/local/bin/geode
 
