@@ -34,9 +34,10 @@ jobs:
           mkdir -p ~/.local/share/Geode /tmp/gd
           printf "default\n/tmp/gd\nandroid64\n" | geode config setup || true
           geode sdk install /home/runner/geode-sdk
+          git -C /home/runner/geode-sdk fetch --tags
+          git -C /home/runner/geode-sdk checkout v5.11.2
           export GEODE_SDK=/home/runner/geode-sdk
           geode sdk set-path /home/runner/geode-sdk
-          geode sdk version v5.11.2
           geode sdk install-binaries -p android64
 
       - name: Build .geode mod
