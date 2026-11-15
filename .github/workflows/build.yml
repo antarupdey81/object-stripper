@@ -49,7 +49,7 @@ jobs:
           ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
           GEODE_SDK: /home/runner/geode-sdk
         run: |
-          geode build -p android64
+          geode build -p android64 -- -DCMAKE_BUILD_TYPE=Release
 
       - name: Upload .geode artifact
         uses: actions/upload-artifact@v4
