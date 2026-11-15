@@ -14,13 +14,18 @@ static bool isGameplayObject(GameObject* obj) {
         return true;
     }
 
-    // 2. Protect Start Pos (ID 31) and triggers
+    // 2. Protect TeleportPortalObjects (paired portals hold raw pointers to each other)
+    if (typeinfo_cast<TeleportPortalObject*>(obj) != nullptr) {
+        return true;
+    }
+
+    // 3. Protect Start Pos (ID 31) and triggers
     if (obj->m_objectID == 31 || obj->m_isTrigger) {
         return true;
     }
 
-    // 3. Protect any object assigned to a Group ID so Move/Alpha/Toggle/Animate triggers
-    // (such as Deadlocked's bosses and moving platforms) never crash on Save & Play
+    // 4. Protect any object assigned to a Group ID so Move/Alpha/Toggle/Animate triggers
+    // (such as Deadlocked's bosses and moving platforms) never crash on playtest/stop
     if (obj->m_groupCount > 0) {
         return true;
     }
@@ -205,9 +210,20 @@ protected:
         size_t totalToRemove = m_queue.size();
         size_t endIdx = std::min(m_cursor + BATCH_SIZE, totalToRemove);
 
-        for (; m_cursor < endIdx; ++m_cursor) {
-            if (auto* obj = m_queue[m_cursor].data()) {
-                editorLayer->removeObject(obj, false);
+        if (m_editorUI) {
+            auto batchArray = CCArray::createWithCapacity(endIdx - m_cursor);
+            for (; m_cursor < endIdx; ++m_cursor) {
+                if (auto* obj = m_queue[m_cursor].data()) {
+                    batchArray->addObject(obj);
+                }
+            }
+            // Native EditorUI deletion properly unlinks paired teleport portals & moving caches
+            m_editorUI->deleteObjects(batchArray, false);
+        } else {
+            for (; m_cursor < endIdx; ++m_cursor) {
+                if (auto* obj = m_queue[m_cursor].data()) {
+                    editorLayer->removeObject(obj, false);
+                }
             }
         }
 
