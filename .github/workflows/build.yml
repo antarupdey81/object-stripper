@@ -31,6 +31,7 @@ jobs:
 
       - name: Install Geode SDK
         run: |
+          printf "\n\n\n" | geode config setup || true
           geode sdk install /home/runner/geode-sdk
           geode sdk set-path /home/runner/geode-sdk
           geode sdk install-binaries -p android64
@@ -38,6 +39,7 @@ jobs:
       - name: Build .geode mod
         env:
           ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GEODE_SDK: /home/runner/geode-sdk
         run: |
           geode build -p android64
 
