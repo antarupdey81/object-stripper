@@ -13,6 +13,6 @@
 	"description": "Enter a target object count in the editor pause menu and automatically delete excess objects or decoration down to that exact number.",
 	"repository": "https://github.com/antarupdey81/object-stripper",
 	"dependencies": {
-		"geode.node-ids": ">=v1.0.0"
+		"geode.node-ids": ">=v1.23.0"
 	}
 }
