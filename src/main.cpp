@@ -5,14 +5,73 @@
 
 using namespace geode::prelude;
 
+static bool isGameplayObject(GameObject* obj) {
+    if (!obj) return false;
+
+    // Protect objects with no-touch / passable disabled or active collision types
+    switch (obj->m_objectType) {
+        case GameObjectType::Solid:
+        case GameObjectType::Hazard:
+        case GameObjectType::AnimatedHazard:
+        case GameObjectType::Slope:
+        case GameObjectType::InverseGravityPortal:
+        case GameObjectType::NormalGravityPortal:
+        case GameObjectType::ShipPortal:
+        case GameObjectType::CubePortal:
+        case GameObjectType::BallPortal:
+        case GameObjectType::UfoPortal:
+        case GameObjectType::WavePortal:
+        case GameObjectType::RobotPortal:
+        case GameObjectType::SpiderPortal:
+        case GameObjectType::SwingPortal:
+        case GameObjectType::YellowJumpPad:
+        case GameObjectType::PinkJumpPad:
+        case GameObjectType::RedJumpPad:
+        case GameObjectType::GravityPad:
+        case GameObjectType::YellowJumpRing:
+        case GameObjectType::PinkJumpRing:
+        case GameObjectType::RedJumpRing:
+        case GameObjectType::GravityRing:
+        case GameObjectType::GreenRing:
+        case GameObjectType::DashRing:
+        case GameObjectType::GravityDashRing:
+        case GameObjectType::DropRing:
+        case GameObjectType::CustomRing:
+        case GameObjectType::TeleportPortal:
+        case GameObjectType::MiniSizePortal:
+        case GameObjectType::RegularSizePortal:
+        case GameObjectType::DualPortal:
+        case GameObjectType::SinglePortal:
+        case GameObjectType::NormalMirrorPortal:
+        case GameObjectType::InverseMirrorPortal:
+        case GameObjectType::SecretCoin:
+        case GameObjectType::UserCoin:
+        case GameObjectType::Collectible:
+        case GameObjectType::Modifier:
+        case GameObjectType::Breakable:
+            return true;
+        default:
+            break;
+    }
+
+    // Protect start positions (ID 31) and common gameplay triggers
+    if (obj->m_objectID == 31 || obj->m_isTrigger) {
+        return true;
+    }
+
+    return false;
+}
+
 class StripObjectsPopup : public geode::Popup {
 protected:
     EditorUI* m_editorUI = nullptr;
     TextInput* m_countInput = nullptr;
     CCLabelBMFont* m_currentCountLabel = nullptr;
+    CCMenuItemToggler* m_decoOnlyToggle = nullptr;
+    bool m_decoOnly = false;
 
     bool init(EditorUI* editorUI) {
-        if (!Popup::init(260.f, 185.f)) {
+        if (!Popup::init(275.f, 215.f)) {
             return false;
         }
 
@@ -29,19 +88,34 @@ protected:
             "goldFont.fnt"
         );
         m_currentCountLabel->setScale(0.55f);
-        m_currentCountLabel->setPosition({ m_size.width / 2.f, m_size.height - 52.f });
+        m_currentCountLabel->setPosition({ m_size.width / 2.f, m_size.height - 50.f });
         m_mainLayer->addChild(m_currentCountLabel);
 
         auto hintLabel = CCLabelBMFont::create("Target object count:", "bigFont.fnt");
         hintLabel->setScale(0.45f);
-        hintLabel->setPosition({ m_size.width / 2.f, m_size.height - 80.f });
+        hintLabel->setPosition({ m_size.width / 2.f, m_size.height - 76.f });
         m_mainLayer->addChild(hintLabel);
 
-        m_countInput = TextInput::create(140.f, "e.g. 500", "bigFont.fnt");
+        m_countInput = TextInput::create(145.f, "e.g. 500", "bigFont.fnt");
         m_countInput->setFilter("0123456789");
         m_countInput->setMaxCharCount(7);
-        m_countInput->setPosition({ m_size.width / 2.f, m_size.height - 108.f });
+        m_countInput->setPosition({ m_size.width / 2.f, m_size.height - 104.f });
         m_mainLayer->addChild(m_countInput);
+
+        // Strip Deco Only toggle row
+        m_decoOnlyToggle = CCMenuItemToggler::createWithStandardSprites(
+            this,
+            menu_selector(StripObjectsPopup::onToggleDecoOnly),
+            0.65f
+        );
+        m_decoOnlyToggle->setPosition({ m_size.width / 2.f - 62.f, m_size.height - 140.f });
+        m_buttonMenu->addChild(m_decoOnlyToggle);
+
+        auto decoLabel = CCLabelBMFont::create("Strip Deco Only", "bigFont.fnt");
+        decoLabel->setScale(0.42f);
+        decoLabel->setAnchorPoint({ 0.f, 0.5f });
+        decoLabel->setPosition({ m_size.width / 2.f - 44.f, m_size.height - 140.f });
+        m_mainLayer->addChild(decoLabel);
 
         auto stripSpr = ButtonSprite::create("Strip", "goldFont.fnt", "GJ_button_06.png", 0.8f);
         auto stripBtn = CCMenuItemSpriteExtra::create(
@@ -49,10 +123,14 @@ protected:
             this,
             menu_selector(StripObjectsPopup::onStrip)
         );
-        stripBtn->setPosition({ m_size.width / 2.f, 34.f });
+        stripBtn->setPosition({ m_size.width / 2.f, 32.f });
         m_buttonMenu->addChild(stripBtn);
 
         return true;
+    }
+
+    void onToggleDecoOnly(CCObject*) {
+        m_decoOnly = !m_decoOnly;
     }
 
     void onStrip(CCObject*) {
@@ -88,7 +166,6 @@ protected:
 
         size_t toDelete = totalObjects - targetCount;
 
-        // Collect objects from the end backwards, skipping locked layers
         std::vector<GameObject*> objectsToRemove;
         objectsToRemove.reserve(toDelete);
 
@@ -96,8 +173,14 @@ protected:
             auto obj = static_cast<GameObject*>(editorLayer->m_objects->objectAtIndex(i));
             if (!obj) continue;
 
+            // Always protect locked layers
             if (editorLayer->isLayerLocked(obj->m_editorLayer) ||
                 (obj->m_editorLayer2 != 0 && editorLayer->isLayerLocked(obj->m_editorLayer2))) {
+                continue;
+            }
+
+            // If Strip Deco Only is enabled, protect solids, hazards, portals, orbs, pads, triggers
+            if (m_decoOnly && isGameplayObject(obj)) {
                 continue;
             }
 
@@ -122,12 +205,16 @@ protected:
         size_t remaining = editorLayer->m_objects->count();
 
         if (removedCount < toDelete) {
+            std::string reason = m_decoOnly
+                ? "remaining objects are <cy>gameplay</c> or on <cr>locked layers</c>."
+                : "remaining objects are on <cr>locked layers</c>.";
             FLAlertLayer::create(
                 "Partially Stripped",
                 fmt::format(
-                    "Deleted <cy>{}</c> objects.\nStopped at <cg>{}</c> objects because remaining objects are on <cr>locked layers</c>.",
+                    "Deleted <cy>{}</c> objects.\nStopped at <cg>{}</c> objects because {}",
                     removedCount,
-                    remaining
+                    remaining,
+                    reason
                 ),
                 "OK"
             )->show();
@@ -165,7 +252,7 @@ class $modify(StripEditorPauseLayer, EditorPauseLayer) {
         }
 
         auto spr = ButtonSprite::create("Strip Objs", "bigFont.fnt", "GJ_button_06.png", 0.6f);
-        spr->setScale(0.75f);
+        spr->setScale(0.7f);
 
         auto btn = CCMenuItemSpriteExtra::create(
             spr,
@@ -174,16 +261,17 @@ class $modify(StripEditorPauseLayer, EditorPauseLayer) {
         );
         btn->setID("strip-objects-btn"_spr);
 
-        if (auto menu = this->getChildByID("small-actions-menu")) {
-            menu->addChild(btn);
-            menu->updateLayout();
-        } else if (auto actionsMenu = this->getChildByID("actions-menu")) {
-            actionsMenu->addChild(btn);
-            actionsMenu->updateLayout();
+        // Place in guidelines-menu (bottom-left stack, completely clear of Uncheck Portals)
+        if (auto guidelinesMenu = this->getChildByID("guidelines-menu")) {
+            guidelinesMenu->addChild(btn);
+            guidelinesMenu->updateLayout();
+        } else if (auto infoMenu = this->getChildByID("info-menu")) {
+            infoMenu->addChild(btn);
+            infoMenu->updateLayout();
         } else {
             auto winSize = CCDirector::sharedDirector()->getWinSize();
             auto fallbackMenu = CCMenu::create();
-            fallbackMenu->setPosition({ 65.f, winSize.height - 90.f });
+            fallbackMenu->setPosition({ 55.f, 95.f });
             fallbackMenu->addChild(btn);
             this->addChild(fallbackMenu);
         }
