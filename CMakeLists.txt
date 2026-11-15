@@ -10,6 +10,10 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 project(ObjectStripper VERSION 1.0.0)
 
+add_library(${object-stripper} SHARED
+    src/main.cpp
+)
+
 if (NOT DEFINED ENV{GEODE_SDK})
     message(FATAL_ERROR "Unable to find Geode SDK! Please define GEODE_SDK environment variable to point to Geode")
 else()
@@ -18,4 +22,4 @@ endif()
 
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 
-setup_geode_mod(${object-stripper} src/main.cpp)
+setup_geode_mod(${object-stripper} ${object-stripper})
